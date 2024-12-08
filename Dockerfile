@@ -1,27 +1,12 @@
 # Anchor Development Container
-# This builds Anchor from scratch - suitable for all environments
-
-# Stage 0: Build yamlfmt
-FROM golang:1 AS go-builder
-# defined from build kit
-# DOCKER_BUILDKIT=1 docker build . -t ...
-ARG TARGETARCH
-
-# Install yamlfmt
-WORKDIR /yamlfmt
-RUN go install github.com/google/yamlfmt/cmd/yamlfmt@latest && \
-    strip $(which yamlfmt) && \
-    yamlfmt --version
+# this uses avm to install binaries, only works on linux amd64
 
 # Stage 1: Node setup
-FROM debian:unstable-slim AS node-slim
+FROM debian:stable-slim AS node-slim
 RUN export DEBIAN_FRONTEND=noninteractive && \
     apt-get update && \
     apt-get install -y -q --no-install-recommends \
-    build-essential \
-    git \
-    gnupg2 \
-    curl \
+    build-essential git gnupg2 curl \
     ca-certificates && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
@@ -30,106 +15,35 @@ ENV NODE_VERSION=v20.9.0
 ENV NVM_DIR=/usr/local/nvm
 
 RUN mkdir -p ${NVM_DIR}
-RUN curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.3/install.sh | bash
+ADD https://raw.githubusercontent.com/creationix/nvm/master/install.sh /usr/local/etc/nvm/install.sh
+RUN bash /usr/local/etc/nvm/install.sh
 
-# Stage 2: Solana Builder
-FROM debian:unstable-slim AS builder
+# Stage 2: Solana Dev
+FROM ghcr.io/jac18281828/solana:latest
 
-ARG TARGETARCH
 RUN export DEBIAN_FRONTEND=noninteractive && \
-  apt-get update && \
-  apt-get install -y -q --no-install-recommends \
-    build-essential \
-    ca-certificates \
-    curl \
-    git \
-    gnupg2 \
-    libc6-dev \ 
-    libclang-dev \
-    libssl-dev \
-    libudev-dev \
-    linux-headers-${TARGETARCH} \
-    llvm \
-    openssl \
-    pkg-config \
-    protobuf-compiler \
-    python3 \
-    && \
-  apt-get clean && \
-  rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+    sudo apt-get update && \
+    sudo apt-get install -y -q --no-install-recommends \
+    unzip \
+    build-essential && \
+    sudo apt-get clean && \
+    sudo rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
 
 ENV USER=solana
-RUN useradd --create-home -s /bin/bash ${USER} && \
-    usermod -a -G sudo ${USER} && \
-    echo '%sudo ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers && \
-    chown -R ${USER}:${USER} /home/${USER}
-
+ARG SOLANA=1.18.26
+ENV CARGO_HOME=/usr/local/cargo
+ENV RUSTUP_HOME=/usr/local/rustup
+ENV PATH=${PATH}:/usr/local/cargo/bin:/go/bin:/home/solana/.local/share/solana/install/releases/${SOLANA}/bin
 USER solana
 
-RUN curl https://sh.rustup.rs -sSf | sh -s -- -y --profile minimal
+# Set user and working directory
+ARG PACKAGE=anchor
+WORKDIR /workspaces/${PACKAGE}
 
-WORKDIR /build
-RUN chown -R ${USER}:${USER} /build
-
-ENV PATH=${PATH}:/home/solana/.cargo/bin
-RUN echo ${PATH} && cargo --version
-
-# Solana
-ARG SOLANA_VERSION=1.18.26
-RUN git clone --depth 1 --branch v${SOLANA_VERSION} https://github.com/solana-labs/solana.git && \
-    cd solana && ./scripts/cargo-install-all.sh /home/solana/.local/share/solana/install/releases/${SOLANA_VERSION}
-RUN for file in /home/solana/.local/share/solana/install/releases/${SOLANA_VERSION}/bin/*; do strip ${file}; done
-ENV PATH=$/build/bin:$PATH
-
-ENV SOLANA=${SOLANA_VERSION}
-CMD echo "Solana in /home/solana/.local/share/solana/install/releases/${SOLANA_VERSION}"
-
-# Stage 3: Solana Dev
-# unstable is required for platform tools v1.43 build
-FROM debian:unstable-slim
-
-RUN export DEBIAN_FRONTEND=noninteractive && \
-    apt-get update && \
-    apt-get install -y -q --no-install-recommends \
-    build-essential \
-    ca-certificates \
-    cmake \
-    curl \
-    git \
-    libc6-dev \ 
-    libclang-dev \
-    libssl-dev \
-    libudev-dev \
-    linux-headers-${TARGETARCH} \
-    ninja-build \
-    openssl \
-    pkg-config \
-    procps \
-    python3 \
-    python3-pip \
-    ripgrep \
-    sudo \
-    unzip \
-    && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
-
-ENV USER=solana
-RUN useradd --create-home -s /bin/bash ${USER} && \
-    usermod -a -G sudo ${USER} && \
-    echo '%sudo ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers && \
-    chown -R ${USER}:${USER} /home/${USER}
-
-ARG SOLANA_VERSION=1.18.26
-ENV CARGO_HOME=/home/${USER}/.cargo
-ENV RUSTUP_HOME=/home/${USER}/.rustup
-COPY --chown=${USER}:${USER} --from=go-builder /go/bin/yamlfmt /go/bin/yamlfmt
-COPY --chown=${USER}:${USER} --from=builder /home/${USER}/.cargo /home/${USER}/.cargo
-COPY --chown=${USER}:${USER} --from=builder /home/${USER}/.rustup /home/${USER}/.rustup
-COPY --chown=${USER}:${USER} --from=builder /home/${USER}/.local/share/solana/install/releases/${SOLANA_VERSION} \
-                                            /home/${USER}/.local/share/solana/install/releases/${SOLANA_VERSION}
-ENV PATH=${PATH}:/home/${USER}/.cargo/bin:/go/bin:/home/${USER}/.local/share/solana/install/releases/${SOLANA_VERSION}/bin
-ENV USER=solana
+RUN rustup toolchain install 1.78.0  && \
+    rustup component add rustfmt clippy rust-analyzer --toolchain 1.78.0 \
+    rustup use default 1.78.0
 
 # Install Node
 ENV NODE_VERSION=v20.9.0
@@ -142,23 +56,13 @@ RUN bash -c ". $NVM_DIR/nvm.sh && nvm install $NODE_VERSION && nvm alias default
 
 RUN npm install npm -g
 RUN npm install yarn -g
-RUN npm install avm -g
 
 USER solana
+# Install Bun
+ADD --chown=${USER}:${USER} --chmod=555 https://bun.sh/install /bun/install.sh
 
-# Set user and working directory
-ARG PACKAGE=anchor_hello
-WORKDIR /workspaces/${PACKAGE}
-
-# Note: latest anchor does not build on 1.80
-RUN rustup toolchain install 1.78.0  && \
-    rustup component add rustfmt clippy rust-analyzer --toolchain 1.78.0 && \
-    rustup default 1.78.0
-
-# Install Anchor and platform tools
-RUN cargo install --git https://github.com/coral-xyz/anchor --tag v0.30.1 anchor-cli --locked && \
+# Install Anchor
+RUN cargo install --git https://github.com/coral-xyz/anchor avm --locked --force && \
+    avm install latest && \
+    avm use latest && \
     anchor --version
-
-cargo-build-sbf --tools-version v1.43 --force-tools-install
-
-CMD [ "anchor", "--version" ]
