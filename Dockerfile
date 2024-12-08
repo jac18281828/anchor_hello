@@ -41,10 +41,6 @@ USER solana
 ARG PACKAGE=anchor
 WORKDIR /workspaces/${PACKAGE}
 
-RUN rustup toolchain install 1.78.0  && \
-    rustup component add rustfmt clippy rust-analyzer --toolchain 1.78.0 \
-    rustup use default 1.78.0
-
 # Install Node
 ENV NODE_VERSION=v20.9.0
 ENV NVM_DIR=/usr/local/nvm
@@ -58,8 +54,10 @@ RUN npm install npm -g
 RUN npm install yarn -g
 
 USER solana
-# Install Bun
-ADD --chown=${USER}:${USER} --chmod=555 https://bun.sh/install /bun/install.sh
+
+RUN rustup toolchain install stable  && \
+    rustup default stable && \
+    rustup component add rustfmt clippy rust-analyzer
 
 # Install Anchor
 RUN cargo install --git https://github.com/coral-xyz/anchor avm --locked --force && \
