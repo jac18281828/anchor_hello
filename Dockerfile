@@ -19,7 +19,7 @@ ADD https://raw.githubusercontent.com/creationix/nvm/master/install.sh /usr/loca
 RUN bash /usr/local/etc/nvm/install.sh
 
 # Stage 2: Solana Dev
-FROM ghcr.io/jac18281828/solana:latest
+FROM ghcr.io/anagrambuild/solana:latest
 
 RUN export DEBIAN_FRONTEND=noninteractive && \
     sudo apt-get update && \
@@ -31,7 +31,7 @@ RUN export DEBIAN_FRONTEND=noninteractive && \
 
 
 ENV USER=solana
-ARG SOLANA=1.18.26
+ARG SOLANA=1.18.22
 ENV CARGO_HOME=/usr/local/cargo
 ENV RUSTUP_HOME=/usr/local/rustup
 ENV PATH=${PATH}:/usr/local/cargo/bin:/go/bin:/home/solana/.local/share/solana/install/releases/${SOLANA}/bin
