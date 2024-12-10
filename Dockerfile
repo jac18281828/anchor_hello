@@ -59,8 +59,11 @@ RUN rustup toolchain install stable  && \
     rustup default stable && \
     rustup component add rustfmt clippy rust-analyzer
 
+# alternate method
+#RUN cargo install --git https://github.com/coral-xyz/anchor --tag v0.30.1 anchor-cli --locked
+
 # Install Anchor
-RUN cargo install --git https://github.com/coral-xyz/anchor avm --force && \
+RUN cargo install --git https://github.com/coral-xyz/anchor avm --locked --force && \
     avm install latest && \
     avm use latest && \
     anchor --version
