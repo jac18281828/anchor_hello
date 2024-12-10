@@ -38,7 +38,7 @@ ENV PATH=${PATH}:/usr/local/cargo/bin:/go/bin:/home/solana/.local/share/solana/i
 USER solana
 
 # Set user and working directory
-ARG PACKAGE=anchor
+ARG PACKAGE=anchor_hello
 WORKDIR /workspaces/${PACKAGE}
 
 # Install Node
@@ -60,7 +60,7 @@ RUN rustup toolchain install stable  && \
     rustup component add rustfmt clippy rust-analyzer
 
 # Install Anchor
-RUN cargo install --git https://github.com/coral-xyz/anchor avm --locked --force && \
+RUN cargo install --git https://github.com/coral-xyz/anchor avm --force && \
     avm install latest && \
     avm use latest && \
     anchor --version
